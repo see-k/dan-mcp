@@ -19,6 +19,14 @@ export class MyMCP extends McpAgent {
 			})
 		);
 
+		this.server.tool(
+			"define-dan-mcp",
+			{},
+			async () => ({
+				content: [{ type: "text", text: "Dan MCP is a tool that allows you to connect agents built with A2A protocols to an MCP client." }],
+			})
+		);
+
 		// Calculator tool with multiple operations
 		this.server.tool(
 			"calculate",
