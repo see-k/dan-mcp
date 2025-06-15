@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 // Define our MCP agent with tools
-export class MyMCP extends McpAgent {
+export class MyMCP extends McpAgent<Env, unknown, { myToken?: string }> {
 	server = new McpServer({
 		name: "Authless Calculator",
 		version: "1.0.0",
@@ -25,6 +25,22 @@ export class MyMCP extends McpAgent {
 			async () => ({
 				content: [{ type: "text", text: "Dan MCP is a tool that allows you to connect agents built with A2A protocols to an MCP client." }],
 			})
+		);
+		
+		this.server.tool(
+			"get-token",
+			{},
+			async () => {
+				const token = (this as any).props.myToken as string;
+				if (!token) {
+					return {
+						content: [{ type: "text", text: "No token found in Authorization header" }],
+					};
+				}
+				return {
+					content: [{ type: "text", text: token }],
+				};
+			}
 		);
 
 		// Calculator tool with multiple operations
@@ -69,12 +85,19 @@ export class MyMCP extends McpAgent {
 export default {
 	fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const url = new URL(request.url);
-
+		const authHeader = request.headers.get("authorization");
+		
+		console.log({authHeader})
+		
+		const token = authHeader?.split(/\s+/)[1] ?? "";
+		ctx.props.myToken = token;
+		
 		if (url.pathname === "/sse" || url.pathname === "/sse/message") {
 			return MyMCP.serveSSE("/sse").fetch(request, env, ctx);
 		}
 
 		if (url.pathname === "/mcp") {
+			// @ts-ignore
 			return MyMCP.serve("/mcp").fetch(request, env, ctx);
 		}
 
