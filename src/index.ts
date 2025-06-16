@@ -10,73 +10,49 @@ export class MyMCP extends McpAgent<Env, unknown, { myToken?: string }> {
 	});
 
 	async init() {
-		// Simple addition tool
+		// Prompt agent tool - makes API call to Node Enterprise
 		this.server.tool(
-			"add",
-			{ a: z.number(), b: z.number() },
-			async ({ a, b }) => ({
-				content: [{ type: "text", text: String(a + b) }],
-			})
-		);
-
-		this.server.tool(
-			"define-dan-mcp",
-			{},
-			async () => ({
-				content: [{ type: "text", text: "Dan MCP is a tool that allows you to connect agents built with A2A protocols to an MCP client." }],
-			})
-		);
-		
-		this.server.tool(
-			"get-token",
-			{},
-			async () => {
+			"prompt-agent",
+			{
+				node_id: z.string().describe("The node ID for the API endpoint"),
+				prompt_message: z.string().describe("The prompt message to send to the agent")
+			},
+			async ({ node_id, prompt_message }) => {
 				const token = (this as any).props.myToken as string;
 				if (!token) {
 					return {
-						content: [{ type: "text", text: "No token found in Authorization header" }],
+						content: [{ type: "text", text: "Error: No authorization token found. Please ensure the Authorization header is set." }],
 					};
 				}
-				return {
-					content: [{ type: "text", text: token }],
-				};
-			}
-		);
 
-		// Calculator tool with multiple operations
-		this.server.tool(
-			"calculate",
-			{
-				operation: z.enum(["add", "subtract", "multiply", "divide"]),
-				a: z.number(),
-				b: z.number(),
-			},
-			async ({ operation, a, b }) => {
-				let result: number;
-				switch (operation) {
-					case "add":
-						result = a + b;
-						break;
-					case "subtract":
-						result = a - b;
-						break;
-					case "multiply":
-						result = a * b;
-						break;
-					case "divide":
-						if (b === 0)
-							return {
-								content: [
-									{
-										type: "text",
-										text: "Error: Cannot divide by zero",
-									},
-								],
-							};
-						result = a / b;
-						break;
+				try {
+					const response = await fetch(`https://api.nodeenterprise.ai/api/chat/${node_id}`, {
+						method: 'POST',
+						headers: {
+							'accept': 'application/json',
+							'Authorization': token,
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							prompt: prompt_message
+						})
+					});
+
+					if (!response.ok) {
+						return {
+							content: [{ type: "text", text: `Error: API request failed with status ${response.status}: ${response.statusText}` }],
+						};
+					}
+
+					const data = await response.json();
+					return {
+						content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+					};
+				} catch (error) {
+					return {
+						content: [{ type: "text", text: `Error making API request: ${error instanceof Error ? error.message : 'Unknown error'}` }],
+					};
 				}
-				return { content: [{ type: "text", text: String(result) }] };
 			}
 		);
 	}
